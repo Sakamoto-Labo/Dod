@@ -1,0 +1,14 @@
+# dependencies
+node_modules/
+
+# native
+android/
+ios/
+
+# expo
+.expo/
+expo-env.d.ts
+
+# build
+CHANGELOG.md
+package-lock.json

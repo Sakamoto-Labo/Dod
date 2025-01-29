@@ -1,0 +1,53 @@
+name: "Lint and Format Check"
+
+on:
+  push:
+    branches:
+      - "main"
+  pull_request:
+    branches:
+      - "**"
+
+jobs:
+  lint-and-format:
+    name: "Lint and Format Validation"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "23.x"
+
+      - name: Install dependencies
+        run: |
+          echo "Installing dependencies..."
+          npm install
+
+      - name: Run ESLint
+        run: |
+          echo "Running ESLint..."
+          npm run lint
+
+      - name: Check code formatting with Prettier
+        run: |
+          echo "Checking code formatting with Prettier..."
+          npm run prettier:check
+
+      - name: Detect unformatted files
+        run: |
+          echo "Detecting unformatted files..."
+          git diff --name-only --diff-filter=M | grep -E '\.(js|jsx|ts|tsx|json)$' | xargs -I {} npm run prettier:check -- {}
+
+      - name: Success notification
+        if: ${{ success() }}
+        run: |
+          echo "All linting and formatting checks passed successfully!"
+
+      - name: Failure notification
+        if: ${{ failure() }}
+        run: |
+          echo "Linting or formatting failed. Please resolve issues and retry."
