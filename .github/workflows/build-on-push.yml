@@ -1,0 +1,69 @@
+name: "On Push To main"
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  check-native-changes:
+    name: "Check Native Code Changes"
+    runs-on: ubuntu-latest
+    concurrency: fingerprint-main
+    outputs:
+      native_changed: ${{ steps.fingerprint.outputs.fingerprint-diff != '[]' }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "23.x"
+          cache: npm
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Check for Native Changes
+        id: fingerprint
+        uses: expo/expo-github-action/fingerprint@main
+        with:
+          packager: npm
+
+  build-or-update:
+    name: "EAS Build or Update"
+    needs: check-native-changes
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "23.x"
+          cache: npm
+
+      - name: Setup Expo
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          eas-version: latest
+          packager: npm
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Run Development Build (if Native Changes)
+        if: needs.check-native-changes.outputs.native_changed == 'true'
+        run: |
+          echo "Native code changes detected. Running EAS Development Build..."
+          eas build --profile development --platform ios --message main --non-interactive
+
+      - name: Run EAS Update (if No Native Changes)
+        if: needs.check-native-changes.outputs.native_changed == 'false'
+        run: |
+          echo "No native changes detected. Running EAS Update..."
+          eas update --message main --channel development --non-interactive

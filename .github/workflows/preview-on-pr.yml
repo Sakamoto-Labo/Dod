@@ -1,0 +1,129 @@
+name: Preview App for Pull Request
+
+on:
+  workflow_run:
+    workflows: ["Switch Operating Environment"]
+    types:
+      - completed
+
+env:
+  NATIVE_CHANGED: false
+  EXPOGO_PREFIX: "exp://u.expo.dev"
+  QRCODE_PREFIX: "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data="
+
+jobs:
+  pull-request-preview:
+    name: Generate PR Preview
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write # Allow comments on PRs
+      actions: write # Allow updating fingerprint in acton caches
+
+    steps:
+      - name: Download PR Metadata
+        uses: actions/download-artifact@v4
+        with:
+          name: pr-metadata
+          path: ./
+
+      - name: Load Environment Variables from JSON
+        run: |
+          PR_NUMBER=$(jq -r '.PR_NUMBER' env.json)
+          PR_TITLE=$(jq -r '.PR_TITLE' env.json)
+          echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
+          echo "PR_TITLE=$PR_TITLE" >> $GITHUB_ENV
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ env.PR_NUMBER }}/merge
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "23.x"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Setup Expo
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          eas-version: latest
+          packager: npm
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Check for Native Code Changes
+        run: |
+          git fetch origin main:main || true
+          if git diff --name-only origin/main...HEAD | grep -E "^(ios/|android/|package.json|package-lock.json|app.json|app.config.js|eas.json)"; then
+            echo "NATIVE_CHANGED=true" >> $GITHUB_ENV
+          fi
+
+      - name: Generate Update Message
+        run: |
+          MESSAGE=$(echo "pr-${{ env.PR_NUMBER }}: ${{ env.PR_TITLE }}" | sed 's/ /_/g')
+          echo "MESSAGE=$MESSAGE" >> $GITHUB_ENV
+
+      - name: Create Development Update For Preview (if no Native changes)
+        if: env.NATIVE_CHANGED == 'false'
+        uses: expo/expo-github-action/preview@v8
+        id: preview_update
+        with:
+          command: eas update --message ${{ env.MESSAGE }} --channel development --non-interactive
+          comment: false
+
+      - name: Post Comment in PR
+        if: env.NATIVE_CHANGED == 'false'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TITLE=${{ steps.preview_update.outputs.message }}
+          RUNTIME_VERSION=${{ steps.preview_update.outputs.runtimeVersion }}
+          PANEL_LINK=${{ steps.preview_update.outputs.link }}
+          COMMIT_HASH=${{ steps.preview_update.outputs.gitCommitHash }}
+          CREATE_AT=${{ steps.preview_update.outputs.createdAt }}
+
+          PROJECT_ID=${{ steps.preview_update.outputs.projectId }}
+          GROUP_ID=${{ steps.preview_update.outputs.groupId }}
+          QR_CODE="${{ env.QRCODE_PREFIX }}${{ env.EXPOGO_PREFIX }}/$PROJECT_ID/group/$GROUP_ID"
+
+          COMMENT_BODY=$(cat <<EOF
+          This PR was automatically deployed!
+          - Title: **$TITLE** 
+          - Channel: **Preview**
+          - Runtime Version: **$RUNTIME_VERSION**
+          - hash(commit): **$COMMIT_HASH**
+          - Created at: **$CREATE_AT**
+          - Link: [Go To Expo Panel ↗]($PANEL_LINK)<br>
+          ![QR Code]($QR_CODE)
+          EOF)
+
+          JSON_PAYLOAD=$(printf '{"body": %s}' "$(echo "$COMMENT_BODY" | jq -Rs .)")
+
+          RESPONSE=$(
+            curl -s -o response.json -w "%{http_code}" \
+              -H "Accept: application/vnd.github.v3+json" \
+              -H "Authorization: token $GITHUB_TOKEN" \
+              "https://api.github.com/repos/${{ github.repository }}/issues/${{ env.PR_NUMBER }}/comments" \
+              -d "$JSON_PAYLOAD"
+          )
+
+          if [[ $RESPONSE -lt 200 || $RESPONSE -ge 300 ]]; then
+            echo "❌ Failed to post comment! GitHub API responded with status: $RESPONSE"
+            echo "GitHub API Response:"
+            cat response.json
+            exit 1
+          fi
+
+          echo "✅ Successfully posted PR comment!"
+
+      - name: Build Full App (Native changes detected)
+        if: env.NATIVE_CHANGED == 'true'
+        uses: expo/expo-github-action/preview-build@main
+        with:
+          command: eas build --platform ios --profile development --message ${{ env.MESSAGE }} --non-interactive
