@@ -1,0 +1,60 @@
+name: Preview App for Pull Request
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    branches:
+      - main
+
+env: NATIVE_CHANGED=false
+
+jobs:
+  preview-build:
+    name: Generate PR Preview
+    if: github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    premissions:
+      pull-requests: write # Allow comments on PRs
+      actions: write # Allow updating fingerprint in acton caches
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "23.x"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Setup Expo
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Check for Native Code Changes
+        id: check_native
+        run: |
+          if git diff --name-only origin/main...HEAD | grep -E "^(ios/|android/|package.json|package-lock.json|app.json|app.config.js|eas.json)"; then
+            echo "NATIVE_CHANGED=true" >> $GITHUB_ENV
+          fi
+
+      - name: Create Preview Update (if no Native changes)
+        if: env.NATIVE_CHANGED == 'false'
+        run: |
+          BRANCH_NAME="pr-${{ github.event.pull_request.number }}"
+          eas update --branch $BRANCH_NAME --non-interactive
+
+      - name: Build Full App (Native changes detected)
+        if: env.NATIVE_CHANGED == 'true'
+        uses: expo/expo-github-action/preview-build@main
+        with:
+          command: eas build --platform ios --profile preview --non-interactive
+
+      - name: Comment in preview
+        uses: expo/expo-github-action/preview-comment@v8
+        with:
+          channel: pr-${{ github.event.number }}
