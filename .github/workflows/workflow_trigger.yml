@@ -1,0 +1,27 @@
+name: Switch Operating Environment
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    branches:
+      - main
+
+jobs:
+  trigger-workflow-run:
+    name: Upload PR Metadata
+    if: github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    concurrency: fingerprint-${{ github.run_id }}
+    steps:
+      - name: Save PR Metadata
+        run: |
+          echo '{ 
+            PR_NUMBER: "${{ github.event.pull_request.number }}",
+            PR_TITLE: "${{ github.event.pull_request.title }}"
+          }' > env.json
+
+      - name: Upload Metadata as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-metadata
+          path: env.json
