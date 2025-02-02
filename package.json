@@ -6,11 +6,19 @@
     "start": "expo start",
     "ios": "expo run:ios",
     "ios_sim": "expo run:ios",
+    "android": "expo run:android",
     "rebuild": "expo prebuild --clean",
     "test": "jest --watchAll",
     "lint": "expo lint",
-    "prettier:check": "prettier --check .",
-    "reset-project": "node ./scripts/reset-project.js"
+    "prettier:check": "prettier --check ."
+  },
+  "codegenConfig": {
+    "name": "dodsdk",
+    "type": "modules",
+    "jsSrcsDir": "specs",
+    "android": {
+      "javaPackageName": "com.dod.specs"
+    }
   },
   "jest": {
     "preset": "jest-expo"
