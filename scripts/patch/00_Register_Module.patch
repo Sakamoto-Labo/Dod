@@ -1,0 +1,25 @@
+diff --git a/ios/dod/AppDelegate.mm b/ios/dod/AppDelegate.mm
+index b27f832..0afc22f 100644
+--- a/ios/dod/AppDelegate.mm
++++ b/ios/dod/AppDelegate.mm
+@@ -2,9 +2,20 @@
+ 
+ #import <React/RCTBundleURLProvider.h>
+ #import <React/RCTLinkingManager.h>
++#import <RCTAppDelegate+Protected.h>
++
++// Add your custom TurboModule header file here
+ 
+ @implementation AppDelegate
+ 
++- (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:(const std::string &)name
++                                                      jsInvoker:(std::shared_ptr<facebook::react::CallInvoker>)jsInvoker
++{
++  // Add your custom TurboModule execution here
++
++  return [super getTurboModule:name jsInvoker:jsInvoker];
++}
++
+ - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
+ {
+   self.moduleName = @"main";

@@ -1,0 +1,23 @@
+diff --git a/ios/dod/AppDelegate.mm b/ios/dod/AppDelegate.mm
+index 0afc22f..b194d1d 100644
+--- a/ios/dod/AppDelegate.mm
++++ b/ios/dod/AppDelegate.mm
+@@ -5,6 +5,7 @@
+ #import <RCTAppDelegate+Protected.h>
+ 
+ // Add your custom TurboModule header file here
++#import "NativeUserSettingTimeStamp.h"
+ 
+ @implementation AppDelegate
+ 
+@@ -12,6 +13,10 @@
+                                                       jsInvoker:(std::shared_ptr<facebook::react::CallInvoker>)jsInvoker
+ {
+   // Add your custom TurboModule execution here
++  if (name == "NativeUserSettingTimeStamp")
++  {
++    return std::make_shared<facebook::react::NativeUserSettingTimeStamp>(jsInvoker);
++  }
+ 
+   return [super getTurboModule:name jsInvoker:jsInvoker];
+ }

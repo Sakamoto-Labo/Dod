@@ -5,12 +5,12 @@
   "scripts": {
     "start": "expo start",
     "ios": "expo run:ios",
-    "ios_sim": "expo run:ios",
     "android": "expo run:android",
-    "rebuild": "expo prebuild --clean",
+    "rebuild": "expo prebuild --clean && ./scripts/install-sdk.sh",
     "test": "jest --watchAll",
     "lint": "expo lint",
-    "prettier:check": "prettier --check ."
+    "prettier:check": "prettier --check .",
+    "eas-build-post-install": "./scripts/install-sdk.sh"
   },
   "codegenConfig": {
     "name": "dodsdk",
