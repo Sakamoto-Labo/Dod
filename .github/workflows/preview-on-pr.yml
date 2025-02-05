@@ -24,8 +24,8 @@ jobs:
       - name: Download PR Metadata
         uses: actions/download-artifact@v4
         with:
+          run-id: ${{ github.event.workflow_run.id }}
           name: pr-metadata
-          path: ./
 
       - name: Load Environment Variables from JSON
         run: |
